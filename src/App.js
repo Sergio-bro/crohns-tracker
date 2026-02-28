@@ -1,4 +1,21 @@
 import { useState, useEffect } from "react";
+import { initializeApp } from "firebase/app";
+import { getDatabase, ref, onValue, set } from "firebase/database";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyACnrLTaXqXQaQgC4M16MyTr2X60aFjktY",
+  authDomain: "crohns-tracker-5d907.firebaseapp.com",
+  projectId: "crohns-tracker-5d907",
+  storageBucket: "crohns-tracker-5d907.firebasestorage.app",
+  messagingSenderId: "657431609369",
+  appId: "1:657431609369:web:9c85079d631beefe546a88",
+  databaseURL: "https://crohns-tracker-5d907-default-rtdb.firebaseio.com"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const PASSWORD = "Sergey2013";
 
 const LANGS = {
   en: {
@@ -27,6 +44,8 @@ const LANGS = {
     infusionCount: "Infusions completed", treatments: "Treatments",
     appointments: "Appointments", medications: "Medications",
     growth: "Growth", symptoms: "Symptoms", notes: "Notes",
+    password: "Enter Password", passwordPlaceholder: "Password", unlock: "Unlock",
+    wrongPassword: "Wrong password, try again!", syncing: "Syncing...", synced: "Synced ✓",
   },
   ru: {
     appTitle: "Трекер здоровья Крона",
@@ -54,6 +73,8 @@ const LANGS = {
     infusionCount: "Завершено инфузий", treatments: "Лечение",
     appointments: "Визиты", medications: "Лекарства",
     growth: "Рост", symptoms: "Симптомы", notes: "Заметки",
+    password: "Введите пароль", passwordPlaceholder: "Пароль", unlock: "Войти",
+    wrongPassword: "Неверный пароль!", syncing: "Синхронизация...", synced: "Синхронизировано ✓",
   },
   zh: {
     appTitle: "克隆氏症健康追蹤器",
@@ -81,6 +102,8 @@ const LANGS = {
     infusionCount: "已完成輸注", treatments: "治療",
     appointments: "預約", medications: "藥物",
     growth: "生長", symptoms: "症狀", notes: "筆記",
+    password: "請輸入密碼", passwordPlaceholder: "密碼", unlock: "登入",
+    wrongPassword: "密碼錯誤！", syncing: "同步中...", synced: "已同步 ✓",
   }
 };
 
@@ -114,7 +137,6 @@ const INIT = {
 };
 
 const TODAY = new Date().toISOString().split("T")[0];
-const tabKeys = ["dashboard","treatments","appointments","medications","growth","symptoms","notes"];
 const gradients = [
   "linear-gradient(135deg,#667eea,#764ba2)",
   "linear-gradient(135deg,#3b82f6,#1d4ed8)",
@@ -189,25 +211,68 @@ function GrowthChart({ data, t }) {
   );
 }
 
+function PasswordScreen({ t, onUnlock }) {
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState(false);
+  function tryUnlock() {
+    if (pw === PASSWORD) { onUnlock(); }
+    else { setErr(true); setPw(""); setTimeout(()=>setErr(false), 2000); }
+  }
+  return (
+    <div style={{ minHeight:"100vh", background:"linear-gradient(135deg,#667eea,#764ba2)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+      <div style={{ background:"#fff", borderRadius:24, padding:40, maxWidth:340, width:"100%", textAlign:"center", boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
+        <div style={{ fontSize:48, marginBottom:16 }}>🏥</div>
+        <div style={{ fontSize:22, fontWeight:800, color:"#1e293b", marginBottom:4 }}>{t.appTitle}</div>
+        <div style={{ fontSize:13, color:"#94a3b8", marginBottom:24 }}>{t.appSub}</div>
+        <input type="password" placeholder={t.passwordPlaceholder} value={pw}
+          onChange={e=>setPw(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&tryUnlock()}
+          style={{ width:"100%", padding:"12px 16px", border:`2px solid ${err?"#ef4444":"#e2e8f0"}`, borderRadius:12, fontSize:16, marginBottom:12, boxSizing:"border-box", textAlign:"center" }}/>
+        {err && <div style={{ color:"#ef4444", fontSize:13, marginBottom:8, fontWeight:600 }}>{t.wrongPassword}</div>}
+        <button onClick={tryUnlock} style={{ width:"100%", background:"linear-gradient(135deg,#667eea,#764ba2)", color:"#fff", border:"none", borderRadius:12, padding:"12px", fontSize:16, fontWeight:700, cursor:"pointer" }}>{t.unlock}</button>
+        <div style={{ marginTop:20, fontSize:12, color:"#94a3b8" }}>🔒 Private family health tracker</div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
-  const [data, setData] = useState(() => {
-    try { const s = localStorage.getItem("crohns_v1"); return s ? JSON.parse(s) : INIT; } catch { return INIT; }
-  });
+  const [unlocked, setUnlocked] = useState(()=>sessionStorage.getItem("crohns_auth")==="1");
+  const [data, setData] = useState(INIT);
   const [lang, setLang] = useState("en");
   const [tab, setTab] = useState(0);
   const [form, setForm] = useState(null);
   const [fv, setFv] = useState({});
+  const [syncStatus, setSyncStatus] = useState("synced");
   const t = LANGS[lang];
 
   useEffect(() => {
-    try { localStorage.setItem("crohns_v1", JSON.stringify(data)); } catch {}
-  }, [data]);
+    if (!unlocked) return;
+    const dbRef = ref(db, "crohns/data");
+    const unsub = onValue(dbRef, (snapshot) => {
+      const val = snapshot.val();
+      if (val) setData(val);
+      else set(dbRef, INIT);
+    });
+    return () => unsub();
+  }, [unlocked]);
 
-  function add(type, item) { setData(d=>({...d,[type]:[...d[type],{id:Date.now(),...item}]})); }
-  function remove(type, id) { setData(d=>({...d,[type]:d[type].filter(r=>r.id!==id)})); }
+  function saveData(newData) {
+    setSyncStatus("syncing");
+    setData(newData);
+    set(ref(db, "crohns/data"), newData)
+      .then(()=>setSyncStatus("synced"))
+      .catch(()=>setSyncStatus("synced"));
+  }
+
+  function unlock() { sessionStorage.setItem("crohns_auth","1"); setUnlocked(true); }
+  function add(type, item) { const nd={...data,[type]:[...data[type],{id:Date.now(),...item}]}; saveData(nd); }
+  function remove(type, id) { const nd={...data,[type]:data[type].filter(r=>r.id!==id)}; saveData(nd); }
   function startForm(name, defaults={}) { setForm(name); setFv(defaults); }
   function saveForm(type) { add(type, fv); setForm(null); setFv({}); }
   const inp = k => ({ value:fv[k], onChange:v=>setFv(f=>({...f,[k]:v})) });
+
+  if (!unlocked) return <PasswordScreen t={t} onUnlock={unlock}/>;
 
   const nextTr = data.treatments.filter(x=>x.status==="upcoming"&&x.date>=TODAY).sort((a,b)=>a.date.localeCompare(b.date))[0];
   const latestGr = data.growth.length ? [...data.growth].sort((a,b)=>b.date.localeCompare(a.date))[0] : null;
@@ -229,7 +294,6 @@ export default function App() {
 
   return (
     <div style={{ fontFamily:"system-ui,sans-serif", background:"#f1f5f9", minHeight:"100vh" }}>
-      {/* HEADER */}
       <div style={{ background:gradients[tab], color:"#fff", padding:"16px 16px 0", position:"sticky", top:0, zIndex:100 }}>
         <div style={{ maxWidth:680, margin:"0 auto" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
@@ -240,7 +304,8 @@ export default function App() {
                 <div style={{ fontSize:11, opacity:0.8 }}>{t.appSub}</div>
               </div>
             </div>
-            <div style={{ display:"flex", gap:4 }}>
+            <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+              <span style={{ fontSize:10, opacity:0.8 }}>{syncStatus==="syncing"?t.syncing:t.synced}</span>
               {[["EN","en"],["RU","ru"],["中","zh"]].map(([l,k])=>(
                 <button key={k} onClick={()=>setLang(k)} style={{ background:lang===k?"rgba(255,255,255,0.3)":"rgba(255,255,255,0.1)", color:"#fff", border:"none", borderRadius:8, padding:"4px 8px", cursor:"pointer", fontWeight:700, fontSize:11 }}>{l}</button>
               ))}
@@ -256,7 +321,6 @@ export default function App() {
 
       <div style={{ maxWidth:680, margin:"0 auto", padding:16 }}>
 
-        {/* DASHBOARD */}
         {tab===0 && <>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:16 }}>
             {[
@@ -298,7 +362,6 @@ export default function App() {
           </Card>
         </>}
 
-        {/* TREATMENTS */}
         {tab===1 && <>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
             <div style={{ fontWeight:800, fontSize:17 }}>💉 {t.treatments}</div>
@@ -329,7 +392,6 @@ export default function App() {
           </Card>}
         </>}
 
-        {/* APPOINTMENTS */}
         {tab===2 && <>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
             <div style={{ fontWeight:800, fontSize:17 }}>📅 {t.appointments}</div>
@@ -360,7 +422,6 @@ export default function App() {
           </Card>}
         </>}
 
-        {/* MEDICATIONS */}
         {tab===3 && <>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
             <div style={{ fontWeight:800, fontSize:17 }}>💊 {t.medications}</div>
@@ -390,7 +451,6 @@ export default function App() {
           </Card>}
         </>}
 
-        {/* GROWTH */}
         {tab===4 && <>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
             <div style={{ fontWeight:800, fontSize:17 }}>📈 {t.growth}</div>
@@ -430,7 +490,6 @@ export default function App() {
           </Card>}
         </>}
 
-        {/* SYMPTOMS */}
         {tab===5 && <>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
             <div style={{ fontWeight:800, fontSize:17 }}>🩺 {t.symptoms}</div>
@@ -470,7 +529,6 @@ export default function App() {
           </Card>}
         </>}
 
-        {/* NOTES */}
         {tab===6 && <>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
             <div style={{ fontWeight:800, fontSize:17 }}>📝 {t.notes}</div>
