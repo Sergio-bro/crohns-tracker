@@ -274,9 +274,9 @@ export default function App() {
 
   if (!unlocked) return <PasswordScreen t={t} onUnlock={unlock}/>;
 
-  const nextTr = data.treatments.filter(x=>x.status==="upcoming"&&x.date>=TODAY).sort((a,b)=>a.date.localeCompare(b.date))[0];
-  const latestGr = data.growth.length ? [...data.growth].sort((a,b)=>b.date.localeCompare(a.date))[0] : null;
-  const doneCount = data.treatments.filter(x=>x.status==="done").length;
+  const nextTr = (data.treatments||[]).filter(x=>x.status==="upcoming"&&x.date>=TODAY).sort((a,b)=>a.date.localeCompare(b.date))[0];
+  const latestGr = (data.growth||[]).length ? [...(data.growth||[])].sort((a,b)=>b.date.localeCompare(a.date))[0] : null;
+  const doneCount = (data.treatments||[]).filter(x=>x.status==="done").length;
 
   const milestones = [
     { done:true,  icon:"✅", text:"NHI Health Insurance activated", date:"2026-02-23", label:"Feb 23, 2026" },
