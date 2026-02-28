@@ -18,8 +18,8 @@ const PASSWORD = "Sergey2013";
 
 const LANGS = {
   en: {
-    appTitle: "Crohn's Care Tracker", appSub: "Health monitoring · Taiwan",
-    tabs: ["Dashboard","Treatments","Appointments","Medications","Growth","Symptoms","Notes"],
+    appTitle:"Crohn's Care Tracker", appSub:"Health monitoring · Taiwan",
+    tabs:["Dashboard","Treatments","Appointments","Medications","Growth","Symptoms","Notes"],
     nextInfusion:"Next Infusion", latestGrowth:"Latest Growth",
     upcoming:"Upcoming", done:"Done", cancelled:"Cancelled",
     addTreatment:"+ Add Treatment", addAppointment:"+ Add Appointment",
@@ -33,7 +33,7 @@ const LANGS = {
     fatigue:"Fatigue (1-10)", fever:"Fever (°C)", fistula:"Fistula Status",
     category:"Category", title:"Title", content:"Content",
     daysUntil:"In", daysAgo:"days ago", today:"Today", days:"days",
-    keyMilestones:"Key Milestones", dietReminder:"Diet Reminder",
+    keyMilestones:"Upcoming Events", dietReminder:"Diet Reminder",
     dietText:"March 1, 2 & 3 — Strict diet required before colonoscopy on March 3rd.",
     withoutCard:"Without Catastrophic Card", withCard:"With Card",
     growthChart:"Growth Chart", weightLabel:"Weight", heightLabel:"Height",
@@ -43,6 +43,9 @@ const LANGS = {
     growth:"Growth", symptoms:"Symptoms", notes:"Notes",
     password:"Enter Password", passwordPlaceholder:"Password", unlock:"Unlock",
     wrongPassword:"Wrong password, try again!", syncing:"Syncing...", synced:"Synced ✓",
+    noUpcoming:"No upcoming events — add treatments or appointments!",
+    completedTreatments:"Completed Treatments", upcomingTreatments:"Upcoming Treatments",
+    pastAppointments:"Past Appointments", upcomingAppointments:"Upcoming Appointments",
   },
   ru: {
     appTitle:"Трекер здоровья Крона", appSub:"Мониторинг здоровья · Тайвань",
@@ -60,7 +63,7 @@ const LANGS = {
     fatigue:"Усталость (1-10)", fever:"Температура (°C)", fistula:"Состояние свища",
     category:"Категория", title:"Заголовок", content:"Содержание",
     daysUntil:"Через", daysAgo:"дней назад", today:"Сегодня", days:"дней",
-    keyMilestones:"Ключевые события", dietReminder:"Напоминание о диете",
+    keyMilestones:"Предстоящие события", dietReminder:"Напоминание о диете",
     dietText:"1, 2 и 3 марта — строгая диета перед колоноскопией 3 марта.",
     withoutCard:"Без карты", withCard:"С картой",
     growthChart:"График роста", weightLabel:"Вес", heightLabel:"Рост",
@@ -70,6 +73,9 @@ const LANGS = {
     growth:"Рост", symptoms:"Симптомы", notes:"Заметки",
     password:"Введите пароль", passwordPlaceholder:"Пароль", unlock:"Войти",
     wrongPassword:"Неверный пароль!", syncing:"Синхронизация...", synced:"Синхронизировано ✓",
+    noUpcoming:"Нет предстоящих событий — добавьте лечение или визиты!",
+    completedTreatments:"Завершённые инфузии", upcomingTreatments:"Предстоящие инфузии",
+    pastAppointments:"Прошедшие визиты", upcomingAppointments:"Предстоящие визиты",
   },
   zh: {
     appTitle:"克隆氏症健康追蹤器", appSub:"健康監控 · 台灣",
@@ -87,7 +93,7 @@ const LANGS = {
     fatigue:"疲勞 (1-10)", fever:"發燒 (°C)", fistula:"瘻管狀態",
     category:"類別", title:"標題", content:"內容",
     daysUntil:"還有", daysAgo:"天前", today:"今天", days:"天",
-    keyMilestones:"重要里程碑", dietReminder:"飲食提醒",
+    keyMilestones:"即將到來的事件", dietReminder:"飲食提醒",
     dietText:"3月1、2、3日 — 3月3日大腸鏡檢查前需嚴格飲食控制。",
     withoutCard:"無重大傷病卡", withCard:"持卡後",
     growthChart:"生長圖表", weightLabel:"體重", heightLabel:"身高",
@@ -97,6 +103,9 @@ const LANGS = {
     growth:"生長", symptoms:"症狀", notes:"筆記",
     password:"請輸入密碼", passwordPlaceholder:"密碼", unlock:"登入",
     wrongPassword:"密碼錯誤！", syncing:"同步中...", synced:"已同步 ✓",
+    noUpcoming:"尚無即將到來的事件 — 請新增治療或預約！",
+    completedTreatments:"已完成治療", upcomingTreatments:"即將到來的治療",
+    pastAppointments:"過去的預約", upcomingAppointments:"即將到來的預約",
   }
 };
 
@@ -151,6 +160,20 @@ function daysUntil(dateStr, t) {
     if (diff < 0) return `${Math.abs(diff)} ${t.daysAgo}`;
     return `${t.daysUntil} ${diff} ${t.days}`;
   } catch { return ""; }
+}
+
+function typeIcon(type) {
+  const t = (type||"").toLowerCase();
+  if (t.includes("infli") || t.includes("infusion") || t.includes("biologic")) return "💉";
+  if (t.includes("colonoscopy")) return "🔬";
+  if (t.includes("mri")) return "🧲";
+  if (t.includes("hospital") || t.includes("admission")) return "🏨";
+  if (t.includes("doctor") || t.includes("appointment") || t.includes("results")) return "👨‍⚕️";
+  if (t.includes("card") || t.includes("catastrophic") || t.includes("insurance")) return "💳";
+  if (t.includes("diet")) return "🍽️";
+  if (t.includes("biopsy")) return "🧬";
+  if (t.includes("surgery")) return "🏥";
+  return "📅";
 }
 
 function Badge({ status, t }) {
@@ -250,7 +273,6 @@ export default function App() {
     const unsub = onValue(dbRef,(snapshot)=>{
       const val = snapshot.val();
       if (val) {
-        // ensure all arrays exist
         setData({
           treatments: safeArr(val.treatments),
           appointments: safeArr(val.appointments),
@@ -259,19 +281,15 @@ export default function App() {
           symptoms: safeArr(val.symptoms),
           notes: safeArr(val.notes),
         });
-      } else {
-        set(dbRef, INIT);
-      }
+      } else { set(dbRef, INIT); }
     });
     return ()=>unsub();
   },[unlocked]);
 
-  function saveData(newData) {
+  function saveData(nd) {
     setSyncStatus("syncing");
-    setData(newData);
-    set(ref(db,"crohns/data"),newData)
-      .then(()=>setSyncStatus("synced"))
-      .catch(()=>setSyncStatus("synced"));
+    setData(nd);
+    set(ref(db,"crohns/data"),nd).then(()=>setSyncStatus("synced")).catch(()=>setSyncStatus("synced"));
   }
 
   function unlock() { sessionStorage.setItem("crohns_auth","1"); setUnlocked(true); }
@@ -290,19 +308,30 @@ export default function App() {
   const symptoms = safeArr(data.symptoms);
   const notes = safeArr(data.notes);
 
-  const nextTr = treatments.filter(x=>x.status==="upcoming"&&x.date>=TODAY).sort((a,b)=>(a.date||"").localeCompare(b.date||""))[0];
-  const latestGr = growth.length ? [...growth].sort((a,b)=>(b.date||"").localeCompare(a.date||""))[0] : null;
+  // ── Dynamic dashboard data ─────────────────────────────────────
   const doneCount = treatments.filter(x=>x.status==="done").length;
+  const nextTr = treatments.filter(x=>x.status==="upcoming"&&(x.date||"")>=TODAY).sort((a,b)=>(a.date||"").localeCompare(b.date||""))[0];
+  const latestGr = growth.length ? [...growth].sort((a,b)=>(b.date||"").localeCompare(a.date||""))[0] : null;
 
-  const milestones = [
-    {done:true,  icon:"✅", text:"NHI Health Insurance activated",      date:"2026-02-23", label:"Feb 23, 2026"},
-    {done:false, icon:"🍽️", text:"Strict diet days",                    date:"2026-03-01", label:"Mar 1-3, 2026"},
-    {done:false, icon:"🏨", text:"Hospital admission (overnight)",      date:"2026-03-02", label:"Mar 2, 2026"},
-    {done:false, icon:"🔬", text:"Colonoscopy + MRI + Biopsy",          date:"2026-03-03", label:"Mar 3, 2026"},
-    {done:false, icon:"👨‍⚕️", text:"Doctor appt + apply for card",       date:"2026-03-13", label:"Mar 13, 2026"},
-    {done:false, icon:"💉", text:"7th Infliximab infusion",              date:"2026-03-27", label:"Mar 27, 2026"},
-    {done:false, icon:"🎉", text:"Catastrophic Card → ~$30/treatment",  date:"2026-04-13", label:"~Apr 13, 2026"},
-  ];
+  // Build milestones dynamically from treatments + appointments
+  const upcomingTreatments = treatments
+    .filter(x=>x.status==="upcoming")
+    .sort((a,b)=>(a.date||"").localeCompare(b.date||""))
+    .map(x=>({ date:x.date, label:`${x.drug} infusion`, sublabel:x.notes||"", icon:typeIcon(x.drug), cost:x.cost }));
+
+  const upcomingAppointments = appointments
+    .filter(x=>x.status==="upcoming")
+    .sort((a,b)=>(a.date||"").localeCompare(b.date||""))
+    .map(x=>({ date:x.date, label:x.type, sublabel:x.notes||"", icon:typeIcon(x.type), cost:"" }));
+
+  // Merge and sort all upcoming events
+  const allUpcoming = [...upcomingTreatments, ...upcomingAppointments]
+    .sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+
+  // Past events (done treatments + past appointments)
+  const doneTreatments = treatments
+    .filter(x=>x.status==="done")
+    .sort((a,b)=>(b.date||"").localeCompare(a.date||""));
 
   const delBtn=(type,id)=>(
     <button onClick={()=>remove(type,id)} style={{background:"#fee2e2",color:"#ef4444",border:"none",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12,fontWeight:700,flexShrink:0}}>✕</button>
@@ -310,6 +339,7 @@ export default function App() {
 
   return (
     <div style={{fontFamily:"system-ui,sans-serif",background:"#f1f5f9",minHeight:"100vh"}}>
+      {/* HEADER */}
       <div style={{background:gradients[tab],color:"#fff",padding:"16px 16px 0",position:"sticky",top:0,zIndex:100}}>
         <div style={{maxWidth:680,margin:"0 auto"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
@@ -337,12 +367,14 @@ export default function App() {
 
       <div style={{maxWidth:680,margin:"0 auto",padding:16}}>
 
+        {/* ── DASHBOARD ── */}
         {tab===0 && <>
+          {/* Stats row */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
             {[
-              {label:t.nextInfusion,value:nextTr?daysUntil(nextTr.date,t):"—",sub:nextTr?.date||"",color:"#3b82f6",bg:"#dbeafe",icon:"💉"},
-              {label:t.infusionCount,value:doneCount,sub:"Infliximab",color:"#10b981",bg:"#d1fae5",icon:"✅"},
-              {label:t.latestGrowth,value:latestGr?`${latestGr.weight}kg`:"—",sub:latestGr?`${latestGr.height}cm`:"",color:"#f59e0b",bg:"#fef3c7",icon:"📈"},
+              {label:t.nextInfusion, value:nextTr?daysUntil(nextTr.date,t):"—", sub:nextTr?.date||"None scheduled", color:"#3b82f6", bg:"#dbeafe", icon:"💉"},
+              {label:t.infusionCount, value:doneCount, sub:"Infliximab", color:"#10b981", bg:"#d1fae5", icon:"✅"},
+              {label:t.latestGrowth, value:latestGr?`${latestGr.weight}kg`:"—", sub:latestGr?`${latestGr.height}cm`:"No data", color:"#f59e0b", bg:"#fef3c7", icon:"📈"},
             ].map((s,i)=>(
               <div key={i} style={{background:s.bg,borderRadius:16,padding:14,textAlign:"center"}}>
                 <div style={{fontSize:22}}>{s.icon}</div>
@@ -352,23 +384,45 @@ export default function App() {
               </div>
             ))}
           </div>
+
+          {/* Dynamic upcoming events */}
           <Card>
             <div style={{fontWeight:700,color:"#1e293b",marginBottom:12,fontSize:15}}>📋 {t.keyMilestones}</div>
-            {milestones.map((m,i)=>(
-              <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:i<milestones.length-1?"1px solid #f1f5f9":"none"}}>
-                <span style={{fontSize:20,minWidth:26}}>{m.icon}</span>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:600,color:m.done?"#10b981":"#1e293b",textDecoration:m.done?"line-through":"none"}}>{m.text}</div>
-                  <div style={{fontSize:11,color:"#94a3b8"}}>{m.label}</div>
+            {allUpcoming.length === 0
+              ? <div style={{color:"#94a3b8",textAlign:"center",padding:16,fontSize:13}}>{t.noUpcoming}</div>
+              : allUpcoming.map((m,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 0",borderBottom:i<allUpcoming.length-1?"1px solid #f1f5f9":"none"}}>
+                  <span style={{fontSize:22,minWidth:28}}>{m.icon}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"#1e293b"}}>{m.label}</div>
+                    <div style={{fontSize:11,color:"#94a3b8"}}>{m.date}</div>
+                    {m.sublabel && <div style={{fontSize:12,color:"#64748b",marginTop:2}}>{m.sublabel}</div>}
+                    {m.cost && <div style={{fontSize:12,color:"#ef4444",fontWeight:600,marginTop:2}}>💰 {m.cost}</div>}
+                  </div>
+                  <span style={{fontSize:12,color:"#6366f1",fontWeight:700,whiteSpace:"nowrap",marginTop:2}}>{daysUntil(m.date,t)}</span>
                 </div>
-                {!m.done && <span style={{fontSize:11,color:"#6366f1",fontWeight:700,whiteSpace:"nowrap"}}>{daysUntil(m.date,t)}</span>}
-              </div>
-            ))}
+              ))
+            }
           </Card>
-          <Card style={{background:"linear-gradient(135deg,#fef3c7,#fffbeb)"}}>
-            <div style={{fontWeight:700,color:"#92400e",marginBottom:6}}>🍽️ {t.dietReminder}</div>
-            <div style={{fontSize:13,color:"#78350f"}}>{t.dietText}</div>
+
+          {/* Completed treatments summary */}
+          <Card style={{background:"linear-gradient(135deg,#d1fae5,#ecfdf5)"}}>
+            <div style={{fontWeight:700,color:"#065f46",marginBottom:10}}>✅ {t.completedTreatments} ({doneCount})</div>
+            {doneTreatments.length===0
+              ? <div style={{color:"#94a3b8",fontSize:13}}>No completed treatments yet</div>
+              : doneTreatments.map((tr,i)=>(
+                <div key={tr.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:i<doneTreatments.length-1?"1px solid #a7f3d0":"none"}}>
+                  <div>
+                    <span style={{fontWeight:700,color:"#065f46",fontSize:13}}>#{doneTreatments.length-i} {tr.drug}</span>
+                    <span style={{color:"#6b7280",fontSize:12,marginLeft:8}}>{tr.date}</span>
+                  </div>
+                  {tr.notes && <span style={{fontSize:11,color:"#6b7280"}}>{tr.notes}</span>}
+                </div>
+              ))
+            }
           </Card>
+
+          {/* Catastrophic card info */}
           <Card style={{background:"linear-gradient(135deg,#fee2e2,#fff1f2)"}}>
             <div style={{fontWeight:700,color:"#b91c1c",marginBottom:6}}>💳 {t.catastrophicCard}</div>
             <div style={{fontSize:13,color:"#7f1d1d"}}>
@@ -378,6 +432,7 @@ export default function App() {
           </Card>
         </>}
 
+        {/* ── TREATMENTS ── */}
         {tab===1 && <>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <div style={{fontWeight:800,fontSize:17}}>💉 {t.treatments}</div>
@@ -408,6 +463,7 @@ export default function App() {
           </Card>}
         </>}
 
+        {/* ── APPOINTMENTS ── */}
         {tab===2 && <>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <div style={{fontWeight:800,fontSize:17}}>📅 {t.appointments}</div>
@@ -438,6 +494,7 @@ export default function App() {
           </Card>}
         </>}
 
+        {/* ── MEDICATIONS ── */}
         {tab===3 && <>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <div style={{fontWeight:800,fontSize:17}}>💊 {t.medications}</div>
@@ -467,6 +524,7 @@ export default function App() {
           </Card>}
         </>}
 
+        {/* ── GROWTH ── */}
         {tab===4 && <>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <div style={{fontWeight:800,fontSize:17}}>📈 {t.growth}</div>
@@ -506,6 +564,7 @@ export default function App() {
           </Card>}
         </>}
 
+        {/* ── SYMPTOMS ── */}
         {tab===5 && <>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <div style={{fontWeight:800,fontSize:17}}>🩺 {t.symptoms}</div>
@@ -545,6 +604,7 @@ export default function App() {
           </Card>}
         </>}
 
+        {/* ── NOTES ── */}
         {tab===6 && <>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <div style={{fontWeight:800,fontSize:17}}>📝 {t.notes}</div>
