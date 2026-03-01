@@ -442,6 +442,7 @@ export default function App() {
               <div style={{color:"#94a3b8",fontSize:13,textAlign:"center",padding:12}}>No notes yet</div>
             }
           </Card>
+        </>}
 
         {/* ── TREATMENTS ── */}
         {tab===1 && <>
