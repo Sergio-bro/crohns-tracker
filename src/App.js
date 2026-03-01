@@ -46,6 +46,7 @@ const LANGS = {
     noUpcoming:"No upcoming events — add treatments or appointments!",
     completedTreatments:"Completed Treatments", upcomingTreatments:"Upcoming Treatments",
     pastAppointments:"Past Appointments", upcomingAppointments:"Upcoming Appointments",
+    notesOverview:"Notes Overview", upcomingNotes:"Upcoming", doneNotes:"Done",
   },
   ru: {
     appTitle:"Трекер здоровья Крона", appSub:"Мониторинг здоровья · Тайвань",
@@ -76,6 +77,7 @@ const LANGS = {
     noUpcoming:"Нет предстоящих событий — добавьте лечение или визиты!",
     completedTreatments:"Завершённые инфузии", upcomingTreatments:"Предстоящие инфузии",
     pastAppointments:"Прошедшие визиты", upcomingAppointments:"Предстоящие визиты",
+    notesOverview:"Заметки", upcomingNotes:"Предстоит", doneNotes:"Выполнено",
   },
   zh: {
     appTitle:"克隆氏症健康追蹤器", appSub:"健康監控 · 台灣",
@@ -106,6 +108,7 @@ const LANGS = {
     noUpcoming:"尚無即將到來的事件 — 請新增治療或預約！",
     completedTreatments:"已完成治療", upcomingTreatments:"即將到來的治療",
     pastAppointments:"過去的預約", upcomingAppointments:"即將到來的預約",
+    notesOverview:"筆記", upcomingNotes:"即將到來", doneNotes:"已完成",
   }
 };
 
@@ -134,7 +137,8 @@ const INIT = {
   ],
   symptoms: [],
   notes: [
-    {id:1,date:"2026-02-23",category:"insurance",title:"NHI Health Insurance Activated",content:"National Health Insurance started Feb 23, 2026 — after 6 months waiting period."},
+    {id:1,date:"2026-04-13",category:"insurance",title:"Catastrophic Card Expected",content:"~1 month after application",status:"upcoming"},
+    {id:2,date:"2026-02-23",category:"insurance",title:"NHI Health Insurance Activated",content:"National Health Insurance started Feb 23, 2026 — after 6 months waiting period.",status:"done"},
   ],
 };
 
@@ -313,7 +317,6 @@ export default function App() {
   const nextTr = treatments.filter(x=>x.status==="upcoming"&&(x.date||"")>=TODAY).sort((a,b)=>(a.date||"").localeCompare(b.date||""))[0];
   const latestGr = growth.length ? [...growth].sort((a,b)=>(b.date||"").localeCompare(a.date||""))[0] : null;
 
-  // Build milestones dynamically from treatments + appointments
   const upcomingTreatments = treatments
     .filter(x=>x.status==="upcoming")
     .sort((a,b)=>(a.date||"").localeCompare(b.date||""))
@@ -324,14 +327,12 @@ export default function App() {
     .sort((a,b)=>(a.date||"").localeCompare(b.date||""))
     .map(x=>({ date:x.date, label:x.type, sublabel:x.notes||"", icon:typeIcon(x.type), cost:"" }));
 
-  // Merge and sort all upcoming events
   const allUpcoming = [...upcomingTreatments, ...upcomingAppointments]
     .sort((a,b)=>(a.date||"").localeCompare(b.date||""));
 
-  // Past events (done treatments + past appointments)
-  const doneTreatments = treatments
-    .filter(x=>x.status==="done")
-    .sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  // Notes split by status
+  const upcomingNotes = notes.filter(n=>n.status==="upcoming").sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  const doneNotes = notes.filter(n=>n.status==="done").sort((a,b)=>(b.date||"").localeCompare(a.date||""));
 
   const delBtn=(type,id)=>(
     <button onClick={()=>remove(type,id)} style={{background:"#fee2e2",color:"#ef4444",border:"none",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12,fontWeight:700,flexShrink:0}}>✕</button>
@@ -405,20 +406,40 @@ export default function App() {
             }
           </Card>
 
-          {/* Completed treatments summary */}
-          <Card style={{background:"linear-gradient(135deg,#d1fae5,#ecfdf5)"}}>
-            <div style={{fontWeight:700,color:"#065f46",marginBottom:10}}>✅ {t.completedTreatments} ({doneCount})</div>
-            {doneTreatments.length===0
-              ? <div style={{color:"#94a3b8",fontSize:13}}>No completed treatments yet</div>
-              : doneTreatments.map((tr,i)=>(
-                <div key={tr.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:i<doneTreatments.length-1?"1px solid #a7f3d0":"none"}}>
-                  <div>
-                    <span style={{fontWeight:700,color:"#065f46",fontSize:13}}>#{doneTreatments.length-i} {tr.drug}</span>
-                    <span style={{color:"#6b7280",fontSize:12,marginLeft:8}}>{tr.date}</span>
-                  </div>
-                  {tr.notes && <span style={{fontSize:11,color:"#6b7280"}}>{tr.notes}</span>}
+          {/* ── NOTES OVERVIEW (replaces Completed Treatments) ── */}
+          <Card style={{background:"#fff",border:"1px solid #e2e8f0"}}>
+            <div style={{fontWeight:700,color:"#1e293b",marginBottom:12,fontSize:15}}>📝 {t.notesOverview}</div>
+
+            {/* Upcoming Notes — red */}
+            {upcomingNotes.length > 0 && <>
+              <div style={{fontWeight:700,color:"#ef4444",fontSize:12,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>
+                🔴 {t.upcomingNotes}
+              </div>
+              {upcomingNotes.map((n,i)=>(
+                <div key={n.id} style={{padding:"4px 0",borderBottom:"1px solid #fee2e2"}}>
+                  <span style={{color:"#ef4444",fontWeight:700,fontSize:13}}>{i+1}) {n.title}</span>
+                  {n.date && <span style={{color:"#94a3b8",fontSize:11,marginLeft:8}}>{n.date}</span>}
                 </div>
-              ))
+              ))}
+            </>}
+
+            {upcomingNotes.length > 0 && doneNotes.length > 0 && <div style={{marginBottom:10}}/>}
+
+            {/* Done Notes — green */}
+            {doneNotes.length > 0 && <>
+              <div style={{fontWeight:700,color:"#10b981",fontSize:12,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>
+                🟢 {t.doneNotes}
+              </div>
+              {doneNotes.map((n,i)=>(
+                <div key={n.id} style={{padding:"4px 0",borderBottom:"1px solid #d1fae5"}}>
+                  <span style={{color:"#10b981",fontWeight:700,fontSize:13}}>{i+1}) {n.title}</span>
+                  {n.date && <span style={{color:"#94a3b8",fontSize:11,marginLeft:8}}>{n.date}</span>}
+                </div>
+              ))}
+            </>}
+
+            {upcomingNotes.length === 0 && doneNotes.length === 0 &&
+              <div style={{color:"#94a3b8",fontSize:13,textAlign:"center",padding:12}}>No notes yet</div>
             }
           </Card>
 
@@ -608,7 +629,7 @@ export default function App() {
         {tab===6 && <>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <div style={{fontWeight:800,fontSize:17}}>📝 {t.notes}</div>
-            <Btn onClick={()=>startForm("note",{category:"medical"})} color="#64748b">{t.addNote}</Btn>
+            <Btn onClick={()=>startForm("note",{category:"medical",status:"upcoming"})} color="#64748b">{t.addNote}</Btn>
           </div>
           {[...notes].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(n=>{
             const cc={medical:"#ef4444",insurance:"#3b82f6",admin:"#6366f1",diet:"#f59e0b",general:"#10b981"};
@@ -617,9 +638,10 @@ export default function App() {
               <Card key={n.id}>
                 <div style={{display:"flex",justifyContent:"space-between",gap:10}}>
                   <div style={{flex:1}}>
-                    <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:6}}>
+                    <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:6,flexWrap:"wrap"}}>
                       <span style={{background:c+"20",color:c,borderRadius:8,padding:"2px 10px",fontSize:11,fontWeight:700}}>{n.category}</span>
                       <span style={{fontSize:12,color:"#94a3b8"}}>{n.date}</span>
+                      <Badge status={n.status||"upcoming"} t={t}/>
                     </div>
                     <div style={{fontWeight:700,marginBottom:4}}>{n.title}</div>
                     <div style={{fontSize:14,color:"#475569"}}>{n.content}</div>
@@ -636,6 +658,7 @@ export default function App() {
             <textarea placeholder={t.content} value={fv.content||""} onChange={e=>setFv(f=>({...f,content:e.target.value}))}
               style={{width:"100%",padding:"9px 12px",border:"1.5px solid #e2e8f0",borderRadius:10,fontSize:14,marginBottom:8,boxSizing:"border-box",minHeight:80,resize:"vertical"}}/>
             <Sel {...inp("category")} options={[{v:"medical",l:"Medical"},{v:"insurance",l:"Insurance"},{v:"admin",l:"Admin"},{v:"diet",l:"Diet"},{v:"general",l:"General"}]}/>
+            <Sel {...inp("status")} options={[{v:"upcoming",l:t.upcoming},{v:"done",l:t.done}]}/>
             <div style={{display:"flex",gap:8}}><Btn onClick={()=>saveForm("notes")} color="#64748b">{t.save}</Btn><Btn onClick={()=>setForm(null)} color="#94a3b8">{t.cancel}</Btn></div>
           </Card>}
         </>}
