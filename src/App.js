@@ -443,16 +443,6 @@ export default function App() {
             }
           </Card>
 
-          {/* Catastrophic card info */}
-          <Card style={{background:"linear-gradient(135deg,#fee2e2,#fff1f2)"}}>
-            <div style={{fontWeight:700,color:"#b91c1c",marginBottom:6}}>💳 {t.catastrophicCard}</div>
-            <div style={{fontSize:13,color:"#7f1d1d"}}>
-              <b>{t.withoutCard}:</b> ~$1,000 USD/treatment<br/>
-              <b>{t.withCard}:</b> ~$30 USD/treatment 🎉
-            </div>
-          </Card>
-        </>}
-
         {/* ── TREATMENTS ── */}
         {tab===1 && <>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
